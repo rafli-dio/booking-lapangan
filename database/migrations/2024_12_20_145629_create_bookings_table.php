@@ -15,13 +15,12 @@ return new class extends Migration
     {
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); 
-            $table->string('title');
-            $table->text('description')->nullable();
-            $table->dateTime('start');
-            $table->dateTime('end');
-            $table->decimal('price_per_day', 10, 2); 
-            $table->decimal('total_price', 10, 2); 
+            $table->string('nama'); 
+            $table->string('acara');
+            $table->dateTime('mulai');
+            $table->dateTime('akhir');
+            $table->foreignId('lapangan_id')->constrained('lapangans')->onDelete('cascade');
+            $table->decimal('total_harga', 10, 2); 
             $table->timestamps();
         });
     }

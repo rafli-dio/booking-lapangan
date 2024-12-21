@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 use App\Models\Booking;
+use App\Models\Lapangan;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -12,32 +13,42 @@ class BookingController extends Controller
      * @return \Illuminate\Http\Response
      */
 
-     public function home()
-     {
-         return view('home');
-     }
-
-    public function index()
+    public function homePeminjam()
     {
-        $bookings = Booking::all();
-        return view('booking-page', compact('bookings'));
+         return view('peminjam.home');
     }
 
+    // peminjam
+    public function bookingPeminjam()
+    {
+        $lapangan = Lapangan::all();
+        $booking = Booking::with('lapangan')->get();
+        return view('peminjam.booking-page', compact('booking','lapangan'));
+    }
+
+    // admin
+    public function bookingAdmin()
+    {
+        $lapangan = Lapangan::all();
+        $booking = Booking::with('lapangan')->get();
+        return view('admin.booking.index', compact('booking','lapangan'));
+    }
+    
+    // fetch
     public function fetchBookings()
     {
-        $bookings = Booking::all(['id', 'title', 'start', 'end']);
-        return response()->json($bookings);
+        $booking = Booking::all(['acara', 'mulai', 'akhir'])->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'title' => $item->acara,
+                'start' => $item->mulai,
+                'end' => $item->akhir,
+            ];
+        });
+    
+        return response()->json($booking);
     }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
-    }
+    
 
     /**
      * Store a newly created resource in storage.
@@ -48,47 +59,67 @@ class BookingController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required',
-            'title' => 'required',
-            'start' => 'required|date',
-            'end' => 'required|date|after:start',
-            'price_per_day' => 'required|numeric',
+            'nama' => 'required',
+            'acara' => 'required',
+            'mulai' => 'required|date',
+            'akhir' => 'required|date|after:mulai',
+            'lapangan_id' => 'required|exists:lapangans,id', 
         ]);
-
-        $start = new \DateTime($request->start);
-        $end = new \DateTime($request->end);
-        $interval = $start->diff($end);
-        $days = $interval->days + 1; 
-
-        $totalPrice = $days * $request->price_per_day;
-
-        Booking::create(array_merge($request->all(), ['total_price' => $totalPrice]));
-
-        return response()->json(['success' => 'Event created successfully.']);
+    
+        $lapangan = Lapangan::findOrFail($request->lapangan_id);
+    
+        $mulai = new \DateTime($request->mulai);
+        $akhir = new \DateTime($request->akhir);
+        $interval = $mulai->diff($akhir);
+        $jams = $interval->h + ($interval->days * 24); 
+    
+        $total_harga = $jams * $lapangan->harga_per_jam;
+        Booking::create([
+            'nama' => $request->nama,
+            'acara' => $request->acara,
+            'mulai' => $request->mulai,
+            'akhir' => $request->akhir,
+            'lapangan_id' => $request->lapangan_id,
+            'harga_per_jam' => $lapangan->harga_per_jam,
+            'total_harga' => $total_harga,
+        ]);
+    
+        return redirect()->route('booking-page')->with('success', 'Booking berhasil ditambahkan!');
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
+    public function storeBookingAdmin(Request $request)
     {
-        //
-    }
+        $request->validate([
+            'nama' => 'required',
+            'acara' => 'required',
+            'mulai' => 'required|date',
+            'akhir' => 'required|date|after:mulai',
+            'lapangan_id' => 'required|exists:lapangans,id', 
+        ]);
+    
+        $lapangan = Lapangan::findOrFail($request->lapangan_id);
+    
+        $mulai = new \DateTime($request->mulai);
+        $akhir = new \DateTime($request->akhir);
+        $interval = $mulai->diff($akhir);
+        $jams = $interval->h + ($interval->days * 24); 
+    
+        $total_harga = $jams * $lapangan->harga_per_jam;
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        //
+        Booking::create([
+            'nama' => $request->nama,
+            'acara' => $request->acara,
+            'mulai' => $request->mulai,
+            'akhir' => $request->akhir,
+            'lapangan_id' => $request->lapangan_id,
+            'harga_per_jam' => $lapangan->harga_per_jam,
+            'total_harga' => $total_harga,
+        ]);
+    
+        return redirect()->route('booking-admin')->with('success', 'Booking berhasil ditambahkan!');
     }
-
+    
+    
     /**
      * Update the specified resource in storage.
      *
@@ -96,28 +127,39 @@ class BookingController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function updateBooking(Request $request, $id)
     {
         $request->validate([
-            'name' => 'required',
-            'title' => 'required',
-            'start' => 'required|date',
-            'end' => 'required|date|after:start',
-            'price_per_day' => 'required|numeric',
+            'nama' => 'required',
+            'acara' => 'required',
+            'mulai' => 'required|date',
+            'akhir' => 'required|date|after:mulai',
+            'lapangan_id' => 'required|exists:lapangans,id',
         ]);
 
-        $start = new \DateTime($request->start);
-        $end = new \DateTime($request->end);
-        $interval = $start->diff($end);
-        $days = $interval->days + 1; 
+        $lapangan = Lapangan::findOrFail($request->lapangan_id);
 
-        $totalPrice = $days * $request->price_per_day;
+        $mulai = new \DateTime($request->mulai);
+        $akhir = new \DateTime($request->akhir);
+        $interval = $mulai->diff($akhir);
+        $jams = $interval->h + ($interval->days * 24);
+
+        $total_harga = $jams * $lapangan->harga_per_jam;
 
         $booking = Booking::findOrFail($id);
-        $booking->update(array_merge($request->all(), ['total_price' => $totalPrice]));
+        $booking->update([
+            'nama' => $request->nama,
+            'acara' => $request->acara,
+            'mulai' => $request->mulai,
+            'akhir' => $request->akhir,
+            'lapangan_id' => $request->lapangan_id,
+            'harga_per_jam' => $lapangan->harga_per_jam,
+            'total_harga' => $total_harga,
+        ]);
 
-        return response()->json(['success' => 'Event updated successfully.']);
+        return redirect()->route('booking-admin')->with('success', 'Booking berhasil diperbarui!');
     }
+
 
     /**
      * Remove the specified resource from storage.
@@ -125,9 +167,14 @@ class BookingController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+
+     public function destroyBooking($id)
     {
-        Booking::findOrFail($id)->delete();
-        return response()->json(['success' => 'Event deleted successfully.']);
+        $booking = Booking::findOrFail($id);
+        $booking->delete();
+
+        return redirect()->route('booking-admin')->with('success', 'Booking berhasil dihapus!');
     }
+
+
 }
